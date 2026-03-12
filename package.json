@@ -4,6 +4,6 @@
   "description": "Vercel serverless proxy untuk NewsAPI.org — mengatasi CORS",
   "private": true,
   "engines": {
-    "node": "18.x"
+    "node": "24.x"
   }
 }
