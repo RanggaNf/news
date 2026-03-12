@@ -10,7 +10,6 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "GET") return res.status(405).json({ error: "Method tidak diizinkan" });
 
-  // Tentukan sumber: "newsapi" atau "gnews" (default: gnews)
   const source = req.query.source || "gnews";
 
   if (source === "newsapi") {
@@ -22,9 +21,6 @@ export default async function handler(req, res) {
   }
 }
 
-// ─────────────────────────────────────────
-// NewsAPI.org Handler
-// ─────────────────────────────────────────
 async function handleNewsAPI(req, res) {
   const API_KEY = process.env.NEWS_API_KEY;
   if (!API_KEY) {
@@ -54,9 +50,6 @@ async function handleNewsAPI(req, res) {
   }
 }
 
-// ─────────────────────────────────────────
-// GNews Handler
-// ─────────────────────────────────────────
 async function handleGNews(req, res) {
   const API_KEY = process.env.GNEWS_API_KEY;
   if (!API_KEY) {
@@ -75,9 +68,16 @@ async function handleGNews(req, res) {
   queryParams.delete("endpoint");
   queryParams.set("token", API_KEY);
 
-  // Default: bahasa & negara Indonesia
+  // Hapus country - tidak support di plan gratis GNews
+  queryParams.delete("country");
+
+  // Default bahasa Indonesia
   if (!queryParams.has("lang")) queryParams.set("lang", "id");
-  if (!queryParams.has("country")) queryParams.set("country", "id");
+
+  // top-headlines wajib ada category atau q
+  if (endpoint === "top-headlines" && !queryParams.has("q") && !queryParams.has("category")) {
+    queryParams.set("category", "general");
+  }
 
   const url = `https://gnews.io/api/v4/${endpoint}?${queryParams.toString()}`;
 
