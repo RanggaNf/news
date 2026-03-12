@@ -1,59 +1,91 @@
-
 // api/news.js — Vercel Serverless Function
-// Proxy untuk NewsAPI.org agar mengatasi CORS di frontend
+// Proxy gabungan: NewsAPI.org + GNews API
 
 export default async function handler(req, res) {
   // === CORS Headers ===
-  // Ganti "*" dengan domain spesifik kamu jika ingin lebih aman
-  // Contoh: "https://namadomain.com"
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-  // Handle preflight request (OPTIONS)
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "GET") return res.status(405).json({ error: "Method tidak diizinkan" });
 
-  // Hanya izinkan GET
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method tidak diizinkan" });
-  }
+  // Tentukan sumber: "newsapi" atau "gnews" (default: gnews)
+  const source = req.query.source || "gnews";
 
-  // Ambil API key dari environment variable (atur di Vercel Dashboard)
+  if (source === "newsapi") {
+    return handleNewsAPI(req, res);
+  } else if (source === "gnews") {
+    return handleGNews(req, res);
+  } else {
+    return res.status(400).json({ error: 'Parameter "source" tidak valid. Pilihan: newsapi, gnews' });
+  }
+}
+
+// ─────────────────────────────────────────
+// NewsAPI.org Handler
+// ─────────────────────────────────────────
+async function handleNewsAPI(req, res) {
   const API_KEY = process.env.NEWS_API_KEY;
   if (!API_KEY) {
     return res.status(500).json({ error: "NEWS_API_KEY belum diatur di environment variables" });
   }
 
-  // Ambil semua query params dari request, lalu teruskan ke NewsAPI
-  const queryParams = new URLSearchParams(req.query);
-
-  // Tentukan endpoint NewsAPI berdasarkan param "endpoint" (opsional)
-  // Default: /v2/top-headlines
   const endpoint = req.query.endpoint || "top-headlines";
   const validEndpoints = ["top-headlines", "everything", "sources"];
 
   if (!validEndpoints.includes(endpoint)) {
-    return res.status(400).json({ error: `Endpoint tidak valid. Pilihan: ${validEndpoints.join(", ")}` });
+    return res.status(400).json({ error: `Endpoint NewsAPI tidak valid. Pilihan: ${validEndpoints.join(", ")}` });
   }
 
-  // Hapus param "endpoint" dari query agar tidak dikirim ke NewsAPI
+  const queryParams = new URLSearchParams(req.query);
+  queryParams.delete("source");
   queryParams.delete("endpoint");
-
-  // Tambahkan API key
   queryParams.set("apiKey", API_KEY);
 
-  const newsApiUrl = `https://newsapi.org/v2/${endpoint}?${queryParams.toString()}`;
+  const url = `https://newsapi.org/v2/${endpoint}?${queryParams.toString()}`;
 
   try {
-    const response = await fetch(newsApiUrl);
+    const response = await fetch(url);
     const data = await response.json();
-
-    // Teruskan status code dari NewsAPI
     return res.status(response.status).json(data);
   } catch (error) {
-    console.error("Error fetching NewsAPI:", error);
     return res.status(500).json({ error: "Gagal menghubungi NewsAPI", details: error.message });
+  }
+}
+
+// ─────────────────────────────────────────
+// GNews Handler
+// ─────────────────────────────────────────
+async function handleGNews(req, res) {
+  const API_KEY = process.env.GNEWS_API_KEY;
+  if (!API_KEY) {
+    return res.status(500).json({ error: "GNEWS_API_KEY belum diatur di environment variables" });
+  }
+
+  const endpoint = req.query.endpoint || "top-headlines";
+  const validEndpoints = ["top-headlines", "search"];
+
+  if (!validEndpoints.includes(endpoint)) {
+    return res.status(400).json({ error: `Endpoint GNews tidak valid. Pilihan: ${validEndpoints.join(", ")}` });
+  }
+
+  const queryParams = new URLSearchParams(req.query);
+  queryParams.delete("source");
+  queryParams.delete("endpoint");
+  queryParams.set("token", API_KEY);
+
+  // Default: bahasa & negara Indonesia
+  if (!queryParams.has("lang")) queryParams.set("lang", "id");
+  if (!queryParams.has("country")) queryParams.set("country", "id");
+
+  const url = `https://gnews.io/api/v4/${endpoint}?${queryParams.toString()}`;
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    return res.status(response.status).json(data);
+  } catch (error) {
+    return res.status(500).json({ error: "Gagal menghubungi GNews", details: error.message });
   }
 }
