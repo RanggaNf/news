@@ -1,0 +1,9 @@
+{
+  "name": "newsapi-cors-proxy",
+  "version": "1.0.0",
+  "description": "Vercel serverless proxy untuk NewsAPI.org — mengatasi CORS",
+  "private": true,
+  "engines": {
+    "node": "18.x"
+  }
+}
